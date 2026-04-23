@@ -1,7 +1,7 @@
 # 单元格值格式参考
 
-`smartsheet_add_records` 仅支持**字段标题**作为key。
-`smartsheet_update_records` 支持通过 `key_type` 参数指定使用字段标题（`CELL_VALUE_KEY_TYPE_FIELD_TITLE`）或字段 ID（`CELL_VALUE_KEY_TYPE_FIELD_ID`）。
+`smartsheet_add_records`、`+smartsheet_add_records_auto_file` 仅支持**字段标题**作为key。
+`smartsheet_update_records`、`+smartsheet_update_records_auto_file` 支持通过 `key_type` 参数指定使用字段标题（`CELL_VALUE_KEY_TYPE_FIELD_TITLE`）或字段 ID（`CELL_VALUE_KEY_TYPE_FIELD_ID`）。
 
 ## 各字段类型的值格式
 
@@ -122,10 +122,10 @@ wecom-cli contact get_userlist '{}'
 
 ### 9. 图片 (IMAGE)
 
-数组格式：
+数组格式，支持传入本地路径：
 
 ```json
-"封面": [{"image_url": "https://example.com/img.png"}]
+"封面": [{"image_path": "/path/to/img.png"}]
 ```
 
 ### 10. 地理位置 (LOCATION)
@@ -134,6 +134,14 @@ wecom-cli contact get_userlist '{}'
 
 ```json
 "地点": [{"source_type": 1, "id": "地点ID", "latitude": "39.9", "longitude": "116.3", "title": "北京"}]
+```
+
+### 11. 文件
+
+数组格式：
+
+```json
+"文件": [{"file_path": "/path/to/img.png"}]
 ```
 
 ## 完整添加记录示例

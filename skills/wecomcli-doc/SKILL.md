@@ -1,6 +1,6 @@
 ---
 name: wecomcli-doc
-description: 企业微信文档、智能表格和智能文档（原名智能主页）管理技能。提供文档的创建、读取、编辑能力，智能表格的结构管理（子表、字段）和数据管理（记录增删改查），以及智能文档的创建和内容导出。适用场景：(1) 以 Markdown 格式获取文档完整内容 (2) 新建文档或智能表格 (3) 用 Markdown 格式覆写文档内容 (4) 管理智能表格子表和字段/列 (5) 查询、添加、更新、删除智能表格记录 (6) 创建智能文档，将本地 Markdown 文件发布为智能文档 (7) 导出智能文档内容为 Markdown。支持通过 docid 或文档 URL 定位文档。
+description: 企业微信文档、智能表格和智能文档（原名智能主页）管理技能。提供文档的创建、读取、编辑能力，智能表格的创建，以及智能文档的创建和内容导出。适用场景：(1) 以 Markdown 格式获取文档完整内容 (2) 新建文档或智能表格 (3) 用 Markdown 格式覆写文档内容 (4) 创建智能文档，将本地 Markdown 文件发布为智能文档 (5) 导出智能文档内容为 Markdown。支持通过 docid 或文档 URL 定位文档。
 metadata:
   requires:
     bins: ["wecom-cli"]
@@ -11,7 +11,7 @@ metadata:
 
 > `wecom-cli` 是企业微信提供的命令行程序，所有操作通过执行 `wecom-cli` 命令完成。
 
-管理企业微信文档和智能文档（原名智能主页）的创建、读取和编辑，以及智能表格的结构（子表、字段/列）和数据（记录）管理。文档接口支持通过 `docid` 或 `url` 二选一定位文档。
+管理企业微信文档和智能文档（原名智能主页）的创建、读取和编辑。文档接口支持通过 `docid` 或 `url` 二选一定位文档。
 
 > ⚠️ **重要触发规则**：只有当用户明确提到「**智能文档**」或「**智能主页**」时，才使用智能文档相关接口（`smartpage_*` 系列）。其他所有涉及「文档」的场景（如"创建文档"、"写个文档"、"帮我建个文档"等），一律使用企微文档接口（`create_doc` / `get_doc_content` / `edit_doc_content`）。
 
@@ -88,10 +88,12 @@ wecom-cli doc create_doc '{"doc_type": 3, "doc_name": "项目周报"}'
 ```
 - 创建智能表格：
 ```bash
-wecom-cli doc create_doc '{"doc_type": 10, "doc_name": "任务跟踪表"}'
+wecom-cli doc create_doc '{"doc_type": 10, "doc_name": "项目任务表"}'
 ```
 
-**注意**：docid 仅在创建时返回，需妥善保存。创建智能表格时默认包含一个子表，可通过 `smartsheet_get_sheet` 查询其 sheet_id。
+**注意**：
+- docid 仅在创建时返回，需妥善保存
+- 智能表格（doc_type=10）的详细管理功能（子表、字段、数据记录等）已迁移到 `wecomcli-smartsheet` skill，请使用该 skill 进行高级操作
 
 参见 [API 详情](references/create-doc.md)。
 
@@ -162,132 +164,6 @@ wecom-cli doc smartpage_get_export_result '{"task_id": "TASK_ID"}'
 
 参见 [API 详情](references/smartpage-export.md)。
 
----
-
-## 智能表格
-
-### 结构管理
-
-#### smartsheet_get_sheet
-
-查询文档中所有子表信息，返回 sheet_id、title、类型等。
-
-```bash
-wecom-cli doc smartsheet_get_sheet '{"docid": "DOCID"}'
-```
-
-#### smartsheet_add_sheet
-
-添加空子表。新子表不含视图、记录和字段，需通过其他接口补充。
-
-```bash
-wecom-cli doc smartsheet_add_sheet '{"docid": "DOCID", "properties": {"title": "新子表"}}'
-```
-
-**注意**：新建智能表格文档默认已含一个子表，仅需多个子表时调用。
-
-#### smartsheet_update_sheet
-
-修改子表标题。需提供 sheet_id 和新 title。
-
-```bash
-wecom-cli doc smartsheet_update_sheet '{"docid": "DOCID", "properties":{"sheet_id":"SHEET_ID", "title":"新子表"}}'
-```
-
-#### smartsheet_delete_sheet
-
-永久删除子表，**操作不可逆**。
-
-```bash
-wecom-cli doc smartsheet_delete_sheet '{"docid": "DOCID", "sheet_id": "SHEETID"}'
-```
-
-#### smartsheet_get_fields
-
-查询子表的所有字段信息，返回 field_id、field_title、field_type。
-
-```bash
-wecom-cli doc smartsheet_get_fields '{"docid": "DOCID", "sheet_id": "SHEETID"}'
-```
-
-#### smartsheet_add_fields
-
-向子表添加一个或多个字段。单个子表最多 150 个字段。
-
-```bash
-wecom-cli doc smartsheet_add_fields '{"docid": "DOCID", "sheet_id": "SHEETID", "fields": [{"field_title": "任务名称", "field_type": "FIELD_TYPE_TEXT"}]}'
-```
-
-支持的字段类型参见 [字段类型参考](references/smartsheet-field-types.md)。
-
-#### smartsheet_update_fields
-
-更新字段标题。**只能改名，不能改类型**（field_type 必须传原始类型）。field_title 不能更新为原值。
-
-```bash
-wecom-cli doc smartsheet_update_fields '{"docid": "DOCID", "sheet_id": "SHEETID", "fields": [{"field_id": "FIELDID", "field_title": "新标题", "field_type": "FIELD_TYPE_TEXT"}]}'
-```
-
-#### smartsheet_delete_fields
-
-删除一列或多列字段，**操作不可逆**。field_id 可通过 `smartsheet_get_fields` 获取。
-
-```bash
-wecom-cli doc smartsheet_delete_fields '{"docid": "DOCID", "sheet_id": "SHEETID", "field_ids": ["FIELDID"]}'
-```
-
-### 数据管理
-
-#### smartsheet_get_records
-
-查询子表全部记录。
-
-- 通过 docid：
-```bash
-wecom-cli doc smartsheet_get_records '{"docid": "DOCID", "sheet_id": "SHEETID"}'
-```
-- 或通过 URL：
-```bash
-wecom-cli doc smartsheet_get_records '{"url": "https://doc.weixin.qq.com/smartsheet/xxx", "sheet_id": "SHEETID"}'
-```
-
-参见 [API 详情](references/smartsheet-get-records.md)。
-
-#### smartsheet_add_records
-
-添加一行或多行记录，单次建议 500 行内。
-
-**调用前**必须先了解目标表的字段类型（通过 `smartsheet_get_fields`），重点关注 `field_type`。对于单选/多选（Option）字段，需注意匹配已有选项的 `id`。
-
-```bash
-wecom-cli doc smartsheet_add_records '{"docid": "DOCID", "sheet_id": "SHEETID", "records": [{"values": {"任务名称": [{"type": "text", "text": "完成需求文档"}], "优先级": [{"text": "高"}]}}]}'
-```
-
-各字段类型的值格式参见 [单元格值格式参考](references/smartsheet-cell-value-formats.md)。
-
-#### smartsheet_update_records
-
-更新一行或多行记录，单次建议在 500 行内。需提供 record_id（通过 `smartsheet_get_records` 获取）。支持通过 `key_type` 指定 values 的 key 使用字段标题或字段 ID：
-
-- `CELL_VALUE_KEY_TYPE_FIELD_TITLE`：key 为字段标题
-- `CELL_VALUE_KEY_TYPE_FIELD_ID`：key 为字段 ID
-
-```bash
-wecom-cli doc smartsheet_update_records '{"docid": "DOCID", "sheet_id": "SHEETID", "key_type": "CELL_VALUE_KEY_TYPE_FIELD_TITLE", "records": [{"record_id": "RECORDID", "values": {"任务名称": [{"type": "text", "text": "更新后的内容"}]}}]}'
-```
-
-**注意**：创建时间、最后编辑时间、创建人、最后编辑人字段不可更新。
-
-#### smartsheet_delete_records
-
-删除一行或多行记录，单次必须在 500 行内。**操作不可逆**。record_id 通过 `smartsheet_get_records` 获取。
-
-```bash
-wecom-cli doc smartsheet_delete_records '{"docid": "DOCID", "sheet_id": "SHEETID", "record_ids": ["RECORDID1", "RECORDID2"]}'
-```
-
----
-
 ## 典型工作流
 
 > **关键提示**：读取内容前先看 URL 判断品类。`/doc/` 或 `/smartsheet/` → `get_doc_content`；`/smartpage/` → `smartpage_export_task`。只有用户明确提到「智能文档」或「智能主页」时才走 smartpage 流程，其他文档场景一律使用企微文档接口。
@@ -325,27 +201,3 @@ wecom-cli doc smartpage_get_export_result '{"task_id": "TASK_ID"}'
 ```
 ，若 `task_done` 为 `false` 则继续轮询，直到 `task_done` 为 `true`，返回的 `content` 字段即为 Markdown 内容
 
-### 智能表格结构操作
-
-1. **了解表结构** → 
-```bash
-wecom-cli doc smartsheet_get_sheet '{"docid": "DOCID"}'
-```
- →
-```bash
-wecom-cli doc smartsheet_get_fields '{"docid": "DOCID", "sheet_id": "SHEETID"}'
-```
-2. **创建表结构** → `smartsheet_add_sheet` 添加子表 → `smartsheet_add_fields` 定义列
-3. **修改表结构** → `smartsheet_update_fields` 改列名 / `smartsheet_delete_fields` 删列
-
-### 智能表格数据操作
-
-1. **读取数据** → 
-```bash
-wecom-cli doc smartsheet_get_records '{"docid":"DOCID","sheet_id":"SHEETID"}'
-```
-2. **写入数据** → 先 `smartsheet_get_fields` 了解列类型 → 若涉及成员（USER）字段，先通过 `wecomcli-contact` 的 `get_userlist` 查找人员 userid → `smartsheet_add_records` 写入
-3. **更新数据** → 先 `smartsheet_get_records` 获取 record_id → 若涉及成员（USER）字段，先通过 `wecomcli-contact` 的 `get_userlist` 查找人员 userid → `smartsheet_update_records` 更新
-4. **删除数据** → 先 `smartsheet_get_records` 确认 record_id → `smartsheet_delete_records` 删除
-
-> **注意**：成员（USER）类型字段需要填写 `user_id`，不能直接使用姓名。必须先通过 `wecomcli-contact` 技能的 `get_userlist` 接口按姓名查找到对应的 `userid` 后再使用。
