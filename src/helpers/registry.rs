@@ -5,6 +5,9 @@ use anyhow::Result;
 use clap::ArgMatches;
 
 use crate::helpers::doc::smartpage_create::SmartpageCreateHelper;
+use crate::helpers::doc::smartsheet_add_records_auto_file::SmartsheetAddRecordsAutoFileHelper;
+use crate::helpers::doc::smartsheet_update_records_auto_file::SmartsheetUpdateRecordsAutoFileHelper;
+
 /// Helper trait：每个 helper 需要实现此 trait。
 /// `execute` 返回 boxed future 以保证 dyn 兼容（object safety）。
 pub trait Helper: Send + Sync {
@@ -24,7 +27,11 @@ pub struct HelperRegistry {
 
 impl HelperRegistry {
     pub fn new() -> Self {
-        let helpers: Vec<Box<dyn Helper>> = vec![Box::new(SmartpageCreateHelper)];
+        let helpers: Vec<Box<dyn Helper>> = vec![
+            Box::new(SmartpageCreateHelper),
+            Box::new(SmartsheetAddRecordsAutoFileHelper),
+            Box::new(SmartsheetUpdateRecordsAutoFileHelper),
+        ];
         Self { helpers }
     }
 

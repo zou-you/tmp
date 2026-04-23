@@ -12,6 +12,11 @@ pub enum JsonRpcError {
         code: i64,
         payload: serde_json::Value,
     },
+    /// 业务逻辑错误（errcode ≠ 0）
+    BusinessError {
+        errcode: i64,
+        payload: serde_json::Value,
+    },
     /// 响应格式不符合预期
     MalformedResponse(serde_json::Value),
 }
@@ -22,6 +27,9 @@ impl std::fmt::Display for JsonRpcError {
             JsonRpcError::RpcError(res) => write!(f, "请求失败：{res}"),
             JsonRpcError::ApiError { code, payload } => {
                 write!(f, "接口错误 (code={code})：{payload}")
+            }
+            JsonRpcError::BusinessError { errcode, payload } => {
+                write!(f, "业务错误 (errcode={errcode})：{payload}")
             }
             JsonRpcError::MalformedResponse(raw) => {
                 write!(f, "响应格式异常：{raw}")
@@ -38,6 +46,46 @@ struct JsonRpcRequest {
     id: String,
     method: String,
     params: Option<serde_json::Value>,
+}
+
+pub async fn call_json_tool(
+    category: &str,
+    method: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value> {
+    let res = call_tool(category, method, args).await?;
+
+    let malformed = || -> anyhow::Error { JsonRpcError::MalformedResponse(res.clone()).into() };
+
+    let content = res
+        .pointer("/result/content")
+        .and_then(|c| c.as_array())
+        .filter(|arr| arr.len() == 1)
+        .ok_or_else(malformed)?;
+
+    let item = &content[0];
+    if item.get("type").and_then(|t| t.as_str()) != Some("text") {
+        return Err(malformed());
+    }
+    let text = item
+        .get("text")
+        .and_then(|t| t.as_str())
+        .ok_or_else(malformed)?;
+
+    let parsed: serde_json::Value = serde_json::from_str(text).map_err(|_| malformed())?;
+
+    // 3. errcode 必须为 0 或不存在
+    if let Some(errcode) = parsed.get("errcode").and_then(|c| c.as_i64()) {
+        if errcode != 0 {
+            return Err(JsonRpcError::BusinessError {
+                errcode,
+                payload: parsed,
+            }
+            .into());
+        }
+    }
+
+    Ok(parsed)
 }
 
 pub async fn call_tool(

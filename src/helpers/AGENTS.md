@@ -28,7 +28,10 @@
 
 | command | category | struct | 文件 | 说明 |
 |---------|----------|--------|------|------|
+| `+smartsheet_add_records_auto_file` | `doc` | `SmartsheetAddRecordsAutoFileHelper` | `doc/smartsheet_add_records_auto_file.rs` | 添加智能表格记录（自动上传文件/图片） |
+| `+smartsheet_update_records_auto_file` | `doc` | `SmartsheetUpdateRecordsAutoFileHelper` | `doc/smartsheet_update_records_auto_file.rs` | 更新智能表格记录（自动上传文件/图片） |
 | `+smartpage_create` | `doc` | `SmartpageCreateHelper` | `doc/smartpage_create.rs` | 创建智能文档（自动读取本地文件内容作为子页面） |
+
 ---
 
 ## 什么是 Helper
