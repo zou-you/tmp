@@ -11,6 +11,10 @@ pub struct InitArgs {
     /// 跳过交互选择，直接使用扫码方式接入
     #[arg(long)]
     pub noninteractive: bool,
+
+    /// 扫码时不自动在浏览器打开二维码页面
+    #[arg(long = "no-open")]
+    pub no_open: bool,
 }
 
 pub fn build_init_cmd() -> Command {
@@ -32,7 +36,7 @@ pub async fn handle_init_cmd(matches: &ArgMatches) -> Result<()> {
     cliclack::intro("企业微信机器人初始化")?;
 
     let (bot, bind_source) = if args.noninteractive {
-        (init_qrcode().await?, McpBindSource::Qrcode)
+        (init_qrcode(args.no_open).await?, McpBindSource::Qrcode)
     } else {
         let method: &str = cliclack::select("请选择企微机器人接入方式：")
             .item("qrcode", "扫码接入（推荐）", "")
@@ -40,7 +44,7 @@ pub async fn handle_init_cmd(matches: &ArgMatches) -> Result<()> {
             .interact()?;
 
         match method {
-            "qrcode" => (init_qrcode().await?, McpBindSource::Qrcode),
+            "qrcode" => (init_qrcode(args.no_open).await?, McpBindSource::Qrcode),
             _ => (init_manual().await?, McpBindSource::Interactive),
         }
     };
@@ -50,8 +54,8 @@ pub async fn handle_init_cmd(matches: &ArgMatches) -> Result<()> {
 }
 
 /// 扫码接入流程
-async fn init_qrcode() -> Result<auth::Bot> {
-    auth::scan_qrcode_for_bot().await
+async fn init_qrcode(no_open: bool) -> Result<auth::Bot> {
+    auth::scan_qrcode_for_bot(no_open).await
 }
 
 /// 手动输入 Bot ID 和 Secret

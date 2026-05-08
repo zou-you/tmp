@@ -58,7 +58,7 @@ struct BotInfoPayload {
 // ---------------------------------------------------------------------------
 
 /// 扫码接入完整流程：获取二维码 → 终端展示 → 轮询结果 → 返回 Bot
-pub async fn scan_qrcode_for_bot() -> Result<Bot> {
+pub async fn scan_qrcode_for_bot(no_open: bool) -> Result<Bot> {
     let client = build_client()?;
 
     println!("正在获取二维码...");
@@ -76,7 +76,9 @@ pub async fn scan_qrcode_for_bot() -> Result<Bot> {
     }
 
     // 同步在浏览器中打开二维码
-    browser::open_url_by_browser(&qrcode_url);
+    if !no_open {
+        browser::open_url_by_browser(&qrcode_url);
+    }
 
     println!("等待扫码中...");
 
