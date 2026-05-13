@@ -1,6 +1,6 @@
 ---
 name: wecomcli-doc
-description: 企业微信文档、智能表格和智能文档（原名智能主页）管理技能。提供文档的创建、读取、编辑能力，智能表格的创建，以及智能文档的创建和内容导出。适用场景：(1) 以 Markdown 格式获取文档完整内容 (2) 新建文档或智能表格 (3) 用 Markdown 格式覆写文档内容 (4) 创建智能文档，将本地 Markdown 文件发布为智能文档 (5) 导出智能文档内容为 Markdown。支持通过 docid 或文档 URL 定位文档。
+description: 企业微信文档、智能表格和智能文档（原名智能主页）管理技能。提供文档的创建、读取、编辑能力，智能表格的创建，以及智能文档的创建和内容导出。适用场景：(1) 以 Markdown 格式获取文档完整内容 (2) 新建文档或智能表格 (3) 用 Markdown 格式覆写文档内容 (4) 创建智能文档，将本地 Markdown 文件发布为智能文档 (5) 导出智能文档内容为 Markdown。支持通过 docid 或文档 URL 定位文档。用户提及 `https://doc.weixin.qq.com/xxxx` 格式的URL链接时，触发该技能。
 metadata:
   requires:
     bins: ["wecom-cli"]
