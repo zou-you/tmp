@@ -41,7 +41,12 @@ wecom-cli doc <tool_name> '<json_params>'
 查询文档中所有子表信息，返回 sheet_id、title、类型等。
 
 ```bash
+# 通过 docid 查询
 wecom-cli doc smartsheet_get_sheet '{"docid": "DOCID"}'
+# 通过 url 查询
+wecom-cli doc smartsheet_get_sheet '{"url": "https://doc.weixin.qq.com/smartsheet/xxx"}'
+
+# 智能表格其他接口的 docid/url 传入以此类推
 ```
 
 ### smartsheet_add_sheet

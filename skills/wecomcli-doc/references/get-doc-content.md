@@ -1,6 +1,6 @@
 # get_doc_content API
 
-获取企业微信文档的完整内容数据，以 Markdown 格式返回。该接口采用异步轮询机制：首次调用无需传 task_id，接口会返回 task_id；若 task_done 为 false，需携带该 task_id 再次调用，直到 task_done 为 true 时返回完整内容。
+获取企业微信文档、表格的完整内容数据，以 Markdown 格式返回。该接口采用异步轮询机制：首次调用无需传 task_id，接口会返回 task_id；若 task_done 为 false，需携带该 task_id 再次调用，直到 task_done 为 true 时返回完整内容。
 
 ## 技能定义
 
