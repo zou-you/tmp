@@ -93,6 +93,10 @@ wecom-cli doc smartsheet_add_fields '{"docid": "DOCID", "sheet_id": "SHEETID", "
 
 在添加字段前，请先参阅所有字段类型和定义 [字段类型参考](references/smartsheet-field-types.md)。
 
+> 注意：调用本接口前，你必须确认已完成以下操作，否则会多出一个无用的默认列：
+> 1. 已调用 smartsheet_get_fields 查看子表现有字段（新子表会自带一个默认文本字段）
+> 2. 已调用 smartsheet_update_fields 将该默认字段重命名为你需要的第一个字段名 然后在本接口中只传入剩余的字段（不包含第一个字段）。
+
 ### smartsheet_update_fields
 
 更新字段标题。**只能改名，不能改类型**（field_type 必须传原始类型）。field_title 不能更新为原值。
