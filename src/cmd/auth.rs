@@ -37,8 +37,12 @@ fn handle_auth_show(args: &ShowArgs) -> Result<()> {
 }
 
 fn handle_auth_show_default(bot: Option<Bot>) -> Result<()> {
-    if bot.is_some() {
-        println!("{}", serde_json::to_string_pretty(&bot)?);
+    if let Some(bot) = bot {
+        let view = serde_json::json!({
+            "id": bot.id,
+            "create_time": bot.create_time,
+        });
+        println!("{}", serde_json::to_string_pretty(&view)?);
     } else {
         println!("unauthorized");
     }
