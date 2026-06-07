@@ -60,6 +60,35 @@ wecom-cli contact get_userlist '{}'
 wecom-cli doc create_doc '{"doc_type": 3, "doc_name": "项目周报"}'
 ```
 
+### 本地 helper
+
+以 `+` 开头的子命令为本地 helper，用于处理远程 MCP 工具暂不覆盖的客户端侧能力。
+
+开发版编译、全局安装、macOS 权限配置和完整排错说明见 [`desktop-helpers-usage.md`](desktop-helpers-usage.md)。
+
+```bash
+## macOS 企业微信客户端：按手机号添加外部联系人
+wecom-cli contact +add_external_friend \
+  --phone "13800000000" \
+  --remark "张三-客户" \
+  --greeting "你好，我是..."
+
+## macOS 企业微信客户端：给好友发送文本、图片或文件
+wecom-cli msg +send_friend_message --to "张三-客户" --text "你好"
+wecom-cli msg +send_friend_message --to "张三-客户" --image /path/to/a.png
+wecom-cli msg +send_friend_message --to "张三-客户" --file /path/to/report.pdf
+
+## 轮询指定好友新消息，图片和文件会保存到本地目录
+wecom-cli msg +watch_friend --to "张三-客户" --interval-sec 5 --save-dir /tmp/wecom/media
+wecom-cli msg +watch_friend --to "张三-客户" --to "李四-客户" --interval-sec 5
+```
+
+说明：
+- 外部联系人添加、发送图片和发送文件依赖 macOS 桌面自动化，仅支持已登录的 `/Applications/企业微信.app`。
+- 使用桌面自动化前，请在系统设置中授予当前终端“辅助功能”和“自动化”权限。
+- `+watch_friend` 复用消息 MCP 接口，只能读取最近 7 天内消息；首次运行会把最近窗口内未记录过的消息作为新消息输出。
+- `+watch_friend` 可重复传 `--to` 并行监控多个联系人，多目标模式禁用 macOS 桌面消息 fallback。
+
 补充说明：
 - 工具调用默认超时为 30 秒；`get_msg_media` 超时为 120 秒。
 - `get_msg_media`会把媒体文件下载到本地临时目录，返回结果字段`local_path`为文件保存的路径 。

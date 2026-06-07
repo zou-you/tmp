@@ -1,5 +1,7 @@
 mod utils;
 
+use std::path::Path;
+
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 
@@ -7,42 +9,63 @@ const INBOUND_MAX_BYTES: usize = 20 * 1024 * 1024;
 
 /// Intercept a `get_msg_media` response: decode base64 payload, save to disk, and replace the response with a local file reference.
 pub async fn intercept_media_response(res: Value) -> Result<Value> {
-    let Some(result) = res.get("result") else {
-        return Ok(res);
+    Ok(intercept_media_response_inner(res, None).await?.response)
+}
+
+/// Save a `get_msg_media` response and return the concise `media_item` object when present.
+pub async fn extract_media_item_to_dir(res: Value, save_dir: &Path) -> Result<Option<Value>> {
+    Ok(intercept_media_response_inner(res, Some(save_dir))
+        .await?
+        .media_item)
+}
+
+struct MediaIntercept {
+    response: Value,
+    media_item: Option<Value>,
+}
+
+async fn intercept_media_response_inner(
+    res: Value,
+    save_dir: Option<&Path>,
+) -> Result<MediaIntercept> {
+    let Some(text) = extract_mcp_text(&res).map(ToString::to_string) else {
+        return Ok(MediaIntercept {
+            response: res,
+            media_item: None,
+        });
     };
 
-    // 1. Extract the content array from the MCP result
-    let Some(content) = result.get("content").and_then(|c| c.as_array()) else {
-        return Ok(res);
-    };
-
-    // Find the entry where type="text" and text is a string
-    let text_item = content.iter().find(|c| {
-        c.get("type").and_then(|t| t.as_str()) == Some("text")
-            && c.get("text").and_then(|t| t.as_str()).is_some()
-    });
-    let Some(text_item) = text_item else {
-        return Ok(res);
-    };
-    let text = text_item["text"].as_str().unwrap();
-
-    // 2. Parse the business JSON
-    let biz_data: Value = match serde_json::from_str(text) {
+    // Parse the business JSON
+    let biz_data: Value = match serde_json::from_str(&text) {
         Ok(v) => v,
-        Err(_) => return Ok(res), // Not JSON format, return as-is
+        Err(_) => {
+            return Ok(MediaIntercept {
+                response: res,
+                media_item: None,
+            });
+        } // Not JSON format, return as-is
     };
 
     // 3. Validate business response: return as-is when errcode !== 0 or no media_item
     if biz_data.get("errcode").and_then(|c| c.as_i64()) != Some(0) {
-        return Ok(res);
+        return Ok(MediaIntercept {
+            response: res,
+            media_item: None,
+        });
     }
 
     let Some(media_item) = biz_data.get("media_item") else {
-        return Ok(res);
+        return Ok(MediaIntercept {
+            response: res,
+            media_item: None,
+        });
     };
 
     let Some(base64_data) = media_item.get("base64_data").and_then(|d| d.as_str()) else {
-        return Ok(res);
+        return Ok(MediaIntercept {
+            response: res,
+            media_item: None,
+        });
     };
 
     let media_name = media_item.get("name").and_then(|n| n.as_str());
@@ -68,31 +91,94 @@ pub async fn intercept_media_response(res: Value) -> Result<Value> {
     let content_type = utils::detect_mime(media_name, &buffer);
 
     // 6. Save to local file
-    let file_path = utils::save_media(media_name, media_id, &content_type, &buffer).await?;
+    let file_path = match save_dir {
+        Some(dir) => {
+            utils::save_media_to_dir(dir, media_name, media_id, &content_type, &buffer).await?
+        }
+        None => utils::save_media(media_name, media_id, &content_type, &buffer).await?,
+    };
 
     // 7. Build a concise response: remove base64_data, add local path
+    let new_media_item = json!({
+        "media_id": media_id,
+        "name": media_name.unwrap_or_else(|| file_path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")),
+        "type": media_type,
+        "local_path": file_path.to_string_lossy(),
+        "size": buffer.len(),
+        "content_type": content_type,
+    });
     let new_biz_data = json!({
         "errcode": 0,
         "errmsg": "ok",
-        "media_item": {
-            "media_id": media_id,
-            "name": media_name.unwrap_or_else(|| file_path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")),
-            "type": media_type,
-            "local_path": file_path.to_string_lossy(),
-            "size": buffer.len(),
-            "content_type": content_type,
-        },
+        "media_item": new_media_item,
     });
 
     // 8. Replace res in-place with the modified MCP result structure
-    Ok(json!({
-        "result": {
-            "content": [{
-                "type": "text",
-                "text": serde_json::to_string(&new_biz_data)?,
-            }],
-        },
-    }))
+    Ok(MediaIntercept {
+        response: json!({
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": serde_json::to_string(&new_biz_data)?,
+                }],
+            },
+        }),
+        media_item: Some(new_biz_data["media_item"].clone()),
+    })
+}
+
+fn extract_mcp_text(res: &Value) -> Option<&str> {
+    res.get("result")?
+        .get("content")?
+        .as_array()?
+        .iter()
+        .find(|item| {
+            item.get("type").and_then(Value::as_str) == Some("text")
+                && item.get("text").and_then(Value::as_str).is_some()
+        })?
+        .get("text")?
+        .as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn extract_media_item_saves_to_custom_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let business = json!({
+            "errcode": 0,
+            "errmsg": "ok",
+            "media_item": {
+                "media_id": "MEDIAID_1",
+                "name": "hello.txt",
+                "type": "file",
+                "base64_data": "aGVsbG8="
+            }
+        });
+        let response = json!({
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": serde_json::to_string(&business).unwrap()
+                }]
+            }
+        });
+
+        let item = extract_media_item_to_dir(response, dir.path())
+            .await
+            .unwrap()
+            .unwrap();
+        let local_path = item
+            .get("local_path")
+            .and_then(Value::as_str)
+            .map(Path::new)
+            .unwrap();
+
+        assert!(local_path.starts_with(dir.path()));
+        assert_eq!(tokio::fs::read(local_path).await.unwrap(), b"hello");
+    }
 }

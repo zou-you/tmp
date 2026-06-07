@@ -8,9 +8,9 @@
 
 | Skill | 品类 | 说明 |
 | ----- | ---- | ---- |
-| `wecomcli-contact` | contact | 查询通讯录成员 |
+| `wecomcli-contact` | contact | 查询通讯录成员；macOS 桌面 helper 可按手机号添加外部联系人 |
 | `wecomcli-todo` | todo | 待办列表查询、查询待办详情、创建待办、更新待办、删除待办、变更待办状态 |
 | `wecomcli-meeting` | meeting | 创建预约会议、取消会议、更新参会成员、查询会议列表和详情 |
-| `wecomcli-msg` | msg | 查询会话列表、查询会话的消息记录、下载会话中的媒体文件、发送文本消息 |
+| `wecomcli-msg` | msg | 查询会话列表、查询会话的消息记录、下载会话中的媒体文件、发送文本消息；macOS 桌面 helper 可给好友发送图片/文件并轮询新消息 |
 | `wecomcli-schedule` | schedule | 查询日程列表、查询日程详情、取消日程、管理日程参与人、查询用户日程闲忙状态 |
 | `wecomcli-doc` | doc | 创建文档、覆盖写文档、读取文档内容、管理智能表格子表与字段、增删改查智能表行记录 |

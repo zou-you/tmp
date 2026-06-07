@@ -5,6 +5,7 @@
 ## 从这里开始
 
 - 查看 CLI 使用方法、运行时路径和环境变量：[`docs/cli-reference.md`](cli-reference.md)
+- macOS 桌面 helper 编译、安装和使用：[`docs/desktop-helpers-usage.md`](desktop-helpers-usage.md)
 - 查看内置 Skills 的分工和入口：[`docs/skills.md`](skills.md)
 - 本地开发、调试和仓库结构：[`docs/development.md`](development.md)
 

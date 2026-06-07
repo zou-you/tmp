@@ -21,6 +21,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.watch_friend_*.json
 
 # Platform binary directories (populated during build)
 packages/darwin-arm64/bin/

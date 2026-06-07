@@ -37,13 +37,29 @@ pub async fn save_media(
     content_type: &str,
     data: &[u8],
 ) -> anyhow::Result<PathBuf> {
-    let dir = paths::media_dir();
+    save_media_to_dir(
+        &paths::media_dir(),
+        media_name,
+        media_id,
+        content_type,
+        data,
+    )
+    .await
+}
 
-    tokio::fs::create_dir_all(&dir).await?;
+/// Atomically save media data to a caller-provided directory.
+pub async fn save_media_to_dir(
+    dir: &Path,
+    media_name: Option<&str>,
+    media_id: Option<&str>,
+    content_type: &str,
+    data: &[u8],
+) -> anyhow::Result<PathBuf> {
+    tokio::fs::create_dir_all(dir).await?;
 
     let (stem, ext) = determine_file_name(media_name, media_id, content_type);
 
-    let mut tmp = tempfile::NamedTempFile::new_in(&dir)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
 
     #[cfg(unix)]
     {

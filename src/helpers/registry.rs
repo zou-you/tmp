@@ -4,9 +4,12 @@ use std::pin::Pin;
 use anyhow::Result;
 use clap::ArgMatches;
 
+use crate::helpers::contact::add_external_friend::AddExternalFriendHelper;
 use crate::helpers::doc::smartpage_create::SmartpageCreateHelper;
 use crate::helpers::doc::smartsheet_add_records_auto_file::SmartsheetAddRecordsAutoFileHelper;
 use crate::helpers::doc::smartsheet_update_records_auto_file::SmartsheetUpdateRecordsAutoFileHelper;
+use crate::helpers::msg::send_friend_message::SendFriendMessageHelper;
+use crate::helpers::msg::watch_friend::WatchFriendHelper;
 
 /// Helper trait：每个 helper 需要实现此 trait。
 /// `execute` 返回 boxed future 以保证 dyn 兼容（object safety）。
@@ -28,9 +31,12 @@ pub struct HelperRegistry {
 impl HelperRegistry {
     pub fn new() -> Self {
         let helpers: Vec<Box<dyn Helper>> = vec![
+            Box::new(AddExternalFriendHelper),
             Box::new(SmartpageCreateHelper),
             Box::new(SmartsheetAddRecordsAutoFileHelper),
             Box::new(SmartsheetUpdateRecordsAutoFileHelper),
+            Box::new(SendFriendMessageHelper),
+            Box::new(WatchFriendHelper),
         ];
         Self { helpers }
     }

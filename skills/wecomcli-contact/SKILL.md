@@ -1,6 +1,6 @@
 ---
 name: wecomcli-contact
-description: 通讯录成员查询技能，获取当前用户可见范围内的通讯录成员，支持按姓名/别名本地筛选匹配。返回 userid、姓名和别名。⚠️ 仅返回当前用户有权限查看的成员，非全量成员。
+description: 通讯录成员查询技能，获取当前用户可见范围内的通讯录成员，支持按姓名/别名本地筛选匹配；macOS 企业微信客户端 helper 支持按手机号添加外部联系人并设置验证语/备注。返回 userid、姓名和别名。⚠️ get_userlist 仅返回当前用户有权限查看的成员，非全量成员。
 metadata:
   requires:
     bins: ["wecom-cli"]
@@ -66,6 +66,21 @@ wecom-cli contact get_userlist '{}'
 - **精确匹配**：`name` 或 `alias` 与关键词完全一致，直接使用
 - **模糊匹配**：`name` 或 `alias` 包含关键词，返回所有匹配结果
 - **无结果**：告知用户未找到对应人员
+
+### 3. 添加外部联系人（macOS 桌面 helper）
+
+```bash
+wecom-cli contact +add_external_friend \
+  --phone "13800000000" \
+  --remark "张三-客户" \
+  --greeting "你好，我是..."
+```
+
+说明：
+- 该命令通过已登录的 macOS 企业微信客户端执行桌面自动化，不是远程 MCP API。
+- 需要终端拥有系统“辅助功能”和“自动化”权限。
+- 添加外部联系人可能需要对方确认；命令返回 `pending` 时不得向用户表述为已经添加成功。
+- 如果客户端搜索结果无法唯一确认，helper 会尽量返回 `failed` 和 `detail`，不要自动选择候选。
 
 **搜索示例：**
 
@@ -167,6 +182,7 @@ wecom-cli contact get_userlist '{}'
 | 接口 | 用途 | 输入 | 返回 |
 |------|------|------|------|
 | `get_userlist` | 获取可见范围内全量通讯录成员 | 无 | 用户列表（userid、name、alias） |
+| `+add_external_friend` | macOS 客户端按手机号添加外部联系人 | `--phone`, `--remark?`, `--greeting?` | JSON 添加状态 |
 
 ### 本地筛选策略
 

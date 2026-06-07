@@ -1,6 +1,6 @@
 ---
 name: wecomcli-msg
-description: 企业微信消息技能。提供会话列表查询、消息记录拉取（支持文本/图片/文件/语音/视频）、多媒体文件获取和文本消息发送能力。当用户需要"查看消息"、"看聊天记录"、"发消息给某人"、"最近有什么消息"、"给群里发消息"、"看看发了什么图片/文件"时触发。
+description: 企业微信消息技能。提供会话列表查询、消息记录拉取（支持文本/图片/文件/语音/视频）、多媒体文件获取、文本消息发送，以及 macOS 企业微信客户端 helper 发送好友文本/图片/文件和轮询好友新消息。当用户需要"查看消息"、"看聊天记录"、"发消息给某人"、"发图片/文件给好友"、"监听某个好友消息"、"最近有什么消息"、"给群里发消息"、"看看发了什么图片/文件"时触发。
 metadata:
   requires:
     bins: ["wecom-cli"]
@@ -49,6 +49,25 @@ wecom-cli msg send_message '{"chat_type": 1, "chatid": "zhangsan", "msgtype": "t
 ```
 
 向单聊或群聊发送文本消息。参见 [API 详情](references/send-message.md)。
+
+### +send_friend_message — macOS 客户端发送好友文本/图片/文件
+
+```bash
+wecom-cli msg +send_friend_message --to "张三-客户" --text "你好"
+wecom-cli msg +send_friend_message --to "张三-客户" --image /path/to/a.png
+wecom-cli msg +send_friend_message --to "张三-客户" --file /path/to/report.pdf
+```
+
+通过已登录的 macOS 企业微信客户端桌面自动化发送。发送图片/文件目前无远程 MCP 接口，需使用此 helper。参见 [helper 详情](references/send-friend-message.md)。
+
+### +watch_friend — 轮询指定好友新消息
+
+```bash
+wecom-cli msg +watch_friend --to "张三-客户" --interval-sec 5 --save-dir /tmp/wecom/media
+wecom-cli msg +watch_friend --to "张三-客户" --to "李四-客户" --interval-sec 5
+```
+
+按好友名称解析最近 7 天内单聊会话，轮询 `get_message`；可重复传 `--to` 并行监控多个联系人。图片和文件会调用 `get_msg_media` 保存到本地，并以 NDJSON 输出。参见 [helper 详情](references/watch-friend.md)。
 
 ---
 
@@ -140,12 +159,15 @@ wecom-cli msg send_message '{"chat_type": 1, "chatid": "zhangsan", "msgtype": "t
 **用户query示例**：
 - "帮我给张三发一条消息：明天会议改到下午3点"
 - "在项目群里发一条消息：今天下午3点开会"
+- "把这张图片发给张三"
+- "把报告 PDF 发给张三"
 
 **执行流程**：
-1. 通过 **chatid查找规则** 确定目标会话的 `chatid` 和 `chat_type`
+1. 文本消息且目标可解析为 `chatid` 时，可通过 **chatid查找规则** 确定目标会话的 `chatid` 和 `chat_type`
 2. **发送前确认**：向用户确认发送对象和内容（如："即将向 张三 发送：'明天会议改到下午3点'，确认发送吗？"），用户确认后再执行
-3. 调用 `send_message` 发送（`msgtype` 固定为 `text`）
-4. 展示发送结果
+3. 群聊或远程文本发送：调用 `send_message` 发送（`msgtype` 固定为 `text`）
+4. 好友文本、图片或文件发送：调用 `wecom-cli msg +send_friend_message`；图片/文件必须提供本地可读路径
+5. 展示发送结果 JSON；若 helper 返回 `status=failed`，展示 `detail` 并停止
 
 ### 查看消息并回复
 **用户query示例**：
