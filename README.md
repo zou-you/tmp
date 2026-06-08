@@ -88,11 +88,27 @@ wecom-cli --version
 export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
-也可以不安装，直接从源码运行：
+也可以不安装，直接运行源码目录里的二进制：
 
 ```bash
+# 运行已编译的 release 二进制；需要先执行 cargo build --release
+./target/release/wecom-cli msg +watch_all \
+  --interval-sec 5 \
+  --save-dir ../ \
+  --queue-file ../.watch_all_queue.txt \
+  --state-file ../.watch_all_queue_state.json \
+  --verbose
+
+# 通过 cargo run 构建并运行；参数需要写在 -- 后面
 cargo run -- msg +watch_all --interval-sec 10 --save-dir /tmp/wecom/media
 ```
+
+两种源码运行方式的区别：
+
+| 方式                             | 执行对象                                                  | 是否自动编译             | 典型用途                                 |
+| -------------------------------- | --------------------------------------------------------- | ------------------------ | ---------------------------------------- |
+| `./target/release/wecom-cli ...` | 已经由 `cargo build --release` 生成的 release 二进制      | 不会自动编译             | 不想全局安装，但要运行优化后的固定二进制 |
+| `cargo run -- ...`               | Cargo 构建出的开发二进制，默认是 `target/debug/wecom-cli` | 会在源码有变化时自动编译 | 本地开发、调试当前源码                   |
 
 ## 命令格式
 
@@ -208,6 +224,14 @@ wecom-cli msg +watch_friend --to "张三-客户" --to "李四-客户" --interval
 
 # 轮询最近活跃单聊
 wecom-cli msg +watch_all --interval-sec 10 --save-dir /tmp/wecom/media
+
+# 不全局安装时，直接运行已编译的 release 二进制，并使用动态监听队列
+./target/release/wecom-cli msg +watch_all \
+  --interval-sec 5 \
+  --save-dir ../ \
+  --queue-file ../.watch_all_queue.txt \
+  --state-file ../.watch_all_queue_state.json \
+  --verbose
 ```
 
 `+watch_friend` 和 `+watch_all` 输出 NDJSON，每条消息一行。图片和文件会保存到 `--save-dir`，输出中包含 `local_path`。
@@ -224,6 +248,7 @@ wecom-cli msg +watch_all --interval-sec 10 --save-dir /tmp/wecom/media
 | `--verbose`          | `+watch_friend`、`+watch_all` | 将诊断信息写到 stderr，stdout 仍只输出消息 NDJSON                     |
 | `--to`               | `+watch_friend`、`+watch_all` | `+watch_friend` 为监听目标；`+watch_all` 为初始监听队列用户，可重复传 |
 | `--queue-file`       | `+watch_all`                  | 动态监听队列文件，支持一行一个用户名或 JSON 字符串数组                |
+| `--state-file`       | `+watch_all`                  | 自定义去重状态文件；不传时默认写入 `--save-dir/.watch_all.json`       |
 | `--include-server`   | `+watch_all`                  | 队列模式下仍启用服务端消息接口轮询                                    |
 
 `+watch_friend` 只能读取最近 7 天消息；多目标模式会禁用 macOS 桌面消息 fallback。`+watch_all` 启动时只建立基线，不回放历史消息。
