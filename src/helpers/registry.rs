@@ -9,6 +9,7 @@ use crate::helpers::doc::smartpage_create::SmartpageCreateHelper;
 use crate::helpers::doc::smartsheet_add_records_auto_file::SmartsheetAddRecordsAutoFileHelper;
 use crate::helpers::doc::smartsheet_update_records_auto_file::SmartsheetUpdateRecordsAutoFileHelper;
 use crate::helpers::msg::send_friend_message::SendFriendMessageHelper;
+use crate::helpers::msg::watch_all::WatchAllHelper;
 use crate::helpers::msg::watch_friend::WatchFriendHelper;
 
 /// Helper trait：每个 helper 需要实现此 trait。
@@ -36,6 +37,7 @@ impl HelperRegistry {
             Box::new(SmartsheetAddRecordsAutoFileHelper),
             Box::new(SmartsheetUpdateRecordsAutoFileHelper),
             Box::new(SendFriendMessageHelper),
+            Box::new(WatchAllHelper),
             Box::new(WatchFriendHelper),
         ];
         Self { helpers }

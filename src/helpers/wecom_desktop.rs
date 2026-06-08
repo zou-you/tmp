@@ -98,6 +98,13 @@ pub struct DesktopChatMessage {
     pub text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DesktopRecentChatTarget {
+    pub name: String,
+    pub signature: String,
+    pub preview: Option<String>,
+}
+
 pub trait WeComDesktopDriver: Send + Sync {
     fn add_external_friend(
         &self,
@@ -195,6 +202,10 @@ pub fn validate_existing_file(path: &Path, usage: FileUsage) -> Result<PathBuf> 
 pub fn read_friend_text_messages(target: &str) -> Result<Vec<DesktopChatMessage>> {
     validate_target(target)?;
     read_friend_text_messages_impl(target)
+}
+
+pub fn read_recent_chat_target_summaries(limit: usize) -> Result<Vec<DesktopRecentChatTarget>> {
+    read_recent_chat_target_summaries_impl(limit)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -491,29 +502,36 @@ set processName to {process}
 set targetName to {target}
 
 tell application {process} to activate
-delay 0.6
+delay 0.15
 tell application "System Events"
     if not (exists process processName) then error "企业微信进程未启动"
     tell process processName to set frontmost to true
 end tell
 
-if not my isTargetConversationOpen(processName, targetName) then
+if my clickRecentConversation(processName, targetName) then
+    delay 0.15
+else
     tell application "System Events"
         tell process processName to set frontmost to true
         keystroke "f" using {{command down}}
     end tell
-    delay 0.3
+    delay 0.2
     pasteText(targetName)
-    delay 0.6
+    delay 0.4
     tell application "System Events" to key code 36
-    delay 1.2
+    delay 0.8
 end if
 
 set outputLines to {{}}
 tell application "System Events"
     tell process processName
+        set mainWindow to my mainWeComWindow(processName)
         set textIndex to 0
-        set uiElements to entire contents of window 1
+        try
+            set uiElements to entire contents of scroll area 1 of splitter group 1 of splitter group 1 of splitter group 1 of splitter group 1 of mainWindow
+        on error
+            set uiElements to entire contents of mainWindow
+        end try
         repeat with itemElement in uiElements
             try
                 if (role of itemElement as text) is "AXTextArea" then
@@ -549,6 +567,72 @@ fn read_friend_text_messages_impl(_target: &str) -> Result<Vec<DesktopChatMessag
     bail!("当前平台不支持 macOS 企业微信桌面消息读取，请在 macOS 上运行该命令")
 }
 
+#[cfg(target_os = "macos")]
+fn read_recent_chat_target_summaries_impl(limit: usize) -> Result<Vec<DesktopRecentChatTarget>> {
+    let process = applescript_string_literal(&process_name());
+    let limit = limit.max(1);
+    let script = format!(
+        r#"
+{handlers}
+set processName to {process}
+set maxTargets to {limit}
+
+tell application {process} to activate
+delay 0.15
+tell application "System Events"
+    if not (exists process processName) then error "企业微信进程未启动"
+    tell process processName
+        set frontmost to true
+        key code 53
+        delay 0.05
+        key code 53
+    end tell
+end tell
+delay 0.1
+
+set outputLines to {{}}
+tell application "System Events"
+    tell process processName
+        set mainWindow to my mainWeComWindow(processName)
+        set textIndex to 0
+        try
+            set uiElements to entire contents of scroll area 1 of splitter group 1 of splitter group 1 of mainWindow
+        on error
+            set uiElements to entire contents of mainWindow
+        end try
+        repeat with itemElement in uiElements
+            try
+                if (role of itemElement as text) is "AXStaticText" then
+                    set rawText to value of itemElement as text
+                    set cleanText to my trimText(rawText)
+                    if cleanText is not "" then
+                        set textIndex to textIndex + 1
+                        set end of outputLines to (textIndex as text) & tab & my sanitizeLine(cleanText)
+                    end if
+                end if
+            end try
+        end repeat
+    end tell
+end tell
+
+set AppleScript's text item delimiters to linefeed
+set joinedOutput to outputLines as text
+set AppleScript's text item delimiters to ""
+return joinedOutput
+"#,
+        handlers = desktop_read_applescript_handlers(),
+        process = process,
+        limit = limit,
+    );
+
+    parse_recent_chat_target_summaries(&run_osascript(&script)?, limit)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn read_recent_chat_target_summaries_impl(_limit: usize) -> Result<Vec<DesktopRecentChatTarget>> {
+    bail!("当前平台不支持 macOS 企业微信桌面会话列表读取，请在 macOS 上运行该命令")
+}
+
 fn parse_desktop_chat_messages(raw: &str) -> Result<Vec<DesktopChatMessage>> {
     let mut messages = Vec::new();
     for line in raw.lines().filter(|line| !line.trim().is_empty()) {
@@ -564,6 +648,196 @@ fn parse_desktop_chat_messages(raw: &str) -> Result<Vec<DesktopChatMessage>> {
     }
 
     Ok(messages)
+}
+
+#[cfg(test)]
+fn parse_recent_chat_targets(raw: &str, limit: usize) -> Result<Vec<String>> {
+    Ok(parse_recent_chat_target_summaries(raw, limit)?
+        .into_iter()
+        .map(|target| target.name)
+        .collect())
+}
+
+fn parse_recent_chat_target_summaries(
+    raw: &str,
+    limit: usize,
+) -> Result<Vec<DesktopRecentChatTarget>> {
+    if raw
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .all(|line| line.split('\t').count() == 2)
+    {
+        return parse_recent_chat_target_summaries_from_text_sequence(raw, limit);
+    }
+
+    #[derive(Debug)]
+    struct TextItem {
+        x: i64,
+        y: i64,
+        text: String,
+    }
+
+    let mut items = Vec::new();
+    for line in raw.lines().filter(|line| !line.trim().is_empty()) {
+        let parts = line.splitn(3, '\t').collect::<Vec<_>>();
+        if parts.len() != 3 {
+            continue;
+        }
+        let Ok(x) = parts[0].parse::<i64>() else {
+            continue;
+        };
+        let Ok(y) = parts[1].parse::<i64>() else {
+            continue;
+        };
+        items.push(TextItem {
+            x,
+            y,
+            text: parts[2].trim().to_string(),
+        });
+    }
+
+    let mut marker_rows = items
+        .iter()
+        .filter(|item| item.text == "@微信")
+        .map(|item| item.y)
+        .collect::<Vec<_>>();
+    marker_rows.sort_unstable();
+    marker_rows.dedup();
+
+    let mut targets = Vec::new();
+    for marker_y in marker_rows.iter().copied() {
+        if targets.len() >= limit {
+            break;
+        }
+
+        let Some(name_item) = items
+            .iter()
+            .filter(|item| {
+                !item.text.is_empty()
+                    && item.text != "@微信"
+                    && item.x <= 260
+                    && (item.y - marker_y).abs() <= 8
+            })
+            .min_by_key(|item| (item.x, item.y))
+        else {
+            continue;
+        };
+
+        if targets
+            .iter()
+            .any(|target: &DesktopRecentChatTarget| target.name == name_item.text)
+        {
+            continue;
+        }
+
+        let row_end = marker_rows
+            .iter()
+            .copied()
+            .find(|next_y| *next_y > marker_y)
+            .map(|next_y| next_y - 8)
+            .unwrap_or(marker_y + 52);
+        let preview = items
+            .iter()
+            .filter(|item| {
+                item.y > marker_y + 8
+                    && item.y < row_end
+                    && item.x <= 260
+                    && item.text != "@微信"
+                    && item.text != name_item.text
+            })
+            .min_by_key(|item| (item.y, item.x))
+            .map(|item| item.text.clone());
+        targets.push(make_recent_chat_target(name_item.text.clone(), preview));
+    }
+
+    Ok(targets)
+}
+
+fn parse_recent_chat_target_summaries_from_text_sequence(
+    raw: &str,
+    limit: usize,
+) -> Result<Vec<DesktopRecentChatTarget>> {
+    let mut groups = Vec::new();
+    let mut current = Vec::new();
+
+    for line in raw.lines().filter(|line| !line.trim().is_empty()) {
+        let parts = line.splitn(2, '\t').collect::<Vec<_>>();
+        if parts.len() != 2 {
+            continue;
+        }
+        let text = parts[1].trim();
+        if text.is_empty() {
+            continue;
+        }
+
+        current.push(text.to_string());
+        if text == "@微信" {
+            groups.push(std::mem::take(&mut current));
+        }
+    }
+
+    let mut targets = Vec::new();
+    for group in groups {
+        if targets.len() >= limit {
+            break;
+        }
+
+        let row_texts = group
+            .into_iter()
+            .filter(|text| text != "@微信")
+            .collect::<Vec<_>>();
+        let Some(name) = row_texts.first().filter(|name| !name.is_empty()) else {
+            continue;
+        };
+
+        if targets
+            .iter()
+            .any(|target: &DesktopRecentChatTarget| target.name == *name)
+        {
+            continue;
+        }
+
+        let preview = recent_chat_preview_from_row(&row_texts);
+        targets.push(make_recent_chat_target(name.clone(), preview));
+    }
+
+    Ok(targets)
+}
+
+fn recent_chat_preview_from_row(row_texts: &[String]) -> Option<String> {
+    if row_texts.len() >= 3 {
+        return row_texts.get(1).filter(|text| !text.is_empty()).cloned();
+    }
+
+    row_texts
+        .get(1)
+        .filter(|text| !looks_like_recent_chat_time(text))
+        .cloned()
+}
+
+fn make_recent_chat_target(name: String, preview: Option<String>) -> DesktopRecentChatTarget {
+    let signature = format!("{}|{}", name, preview.as_deref().unwrap_or(""));
+    DesktopRecentChatTarget {
+        name,
+        signature,
+        preview,
+    }
+}
+
+fn looks_like_recent_chat_time(text: &str) -> bool {
+    text.contains("分钟前")
+        || text.contains("小时前")
+        || text == "昨天"
+        || text == "星期一"
+        || text == "星期二"
+        || text == "星期三"
+        || text == "星期四"
+        || text == "星期五"
+        || text == "星期六"
+        || text == "星期日"
+        || text
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == ':' || c == '/')
 }
 
 #[cfg(target_os = "macos")]
@@ -603,7 +877,14 @@ on countExactStaticTexts(processName, expectedText)
         tell process processName
             set hitCount to 0
             try
-                set uiTexts to static texts of entire contents of window 1
+                set mainWindow to my mainWeComWindow(processName)
+                set uiElements to entire contents of mainWindow
+                set uiTexts to {}
+                repeat with itemElement in uiElements
+                    try
+                        if (role of itemElement as text) is "AXStaticText" then set end of uiTexts to itemElement
+                    end try
+                end repeat
                 repeat with itemText in uiTexts
                     try
                         set actualText to value of itemText as text
@@ -619,9 +900,10 @@ end countExactStaticTexts
 on clickFirstButton(processName, candidates)
     tell application "System Events"
         tell process processName
+            set mainWindow to my mainWeComWindow(processName)
             repeat with buttonName in candidates
                 try
-                    click (first button of window 1 whose name is (buttonName as text))
+                    click (first button of mainWindow whose name is (buttonName as text))
                     return buttonName as text
                 end try
             end repeat
@@ -668,11 +950,40 @@ on sanitizeLine(sourceText)
     return sanitizedText
 end sanitizeLine
 
+on absNumber(sourceNumber)
+    if sourceNumber < 0 then return -sourceNumber
+    return sourceNumber
+end absNumber
+
+on clickRecentConversation(processName, targetName)
+    tell application "System Events"
+        tell process processName
+            try
+                set mainWindow to my mainWeComWindow(processName)
+                set listElements to entire contents of scroll area 1 of splitter group 1 of splitter group 1 of mainWindow
+                repeat with itemElement in listElements
+                    try
+                        if (role of itemElement as text) is "AXStaticText" then
+                            set rawText to value of itemElement as text
+                            if rawText is targetName then
+                                click itemElement
+                                return true
+                            end if
+                        end if
+                    end try
+                end repeat
+            end try
+        end tell
+    end tell
+    return false
+end clickRecentConversation
+
 on isTargetConversationOpen(processName, targetName)
     tell application "System Events"
         tell process processName
             try
-                set uiElements to entire contents of window 1
+                set mainWindow to my mainWeComWindow(processName)
+                set uiElements to entire contents of mainWindow
                 repeat with itemElement in uiElements
                     try
                         if (role of itemElement as text) is "AXStaticText" then
@@ -691,6 +1002,29 @@ on isTargetConversationOpen(processName, targetName)
     end tell
     return false
 end isTargetConversationOpen
+
+on mainWeComWindow(processName)
+    tell application "System Events"
+        tell process processName
+            set bestWindow to missing value
+            set bestArea to 0
+            repeat with itemWindow in windows
+                try
+                    set itemSize to size of itemWindow
+                    set itemWidth to item 1 of itemSize
+                    set itemHeight to item 2 of itemSize
+                    set itemArea to itemWidth * itemHeight
+                    if itemArea > bestArea then
+                        set bestArea to itemArea
+                        set bestWindow to itemWindow
+                    end if
+                end try
+            end repeat
+            if bestWindow is missing value then error "未找到企业微信主窗口"
+            return bestWindow
+        end tell
+    end tell
+end mainWeComWindow
 "#
 }
 
@@ -736,11 +1070,40 @@ on sanitizeLine(sourceText)
     return sanitizedText
 end sanitizeLine
 
+on absNumber(sourceNumber)
+    if sourceNumber < 0 then return -sourceNumber
+    return sourceNumber
+end absNumber
+
+on clickRecentConversation(processName, targetName)
+    tell application "System Events"
+        tell process processName
+            try
+                set mainWindow to my mainWeComWindow(processName)
+                set listElements to entire contents of scroll area 1 of splitter group 1 of splitter group 1 of mainWindow
+                repeat with itemElement in listElements
+                    try
+                        if (role of itemElement as text) is "AXStaticText" then
+                            set rawText to value of itemElement as text
+                            if rawText is targetName then
+                                click itemElement
+                                return true
+                            end if
+                        end if
+                    end try
+                end repeat
+            end try
+        end tell
+    end tell
+    return false
+end clickRecentConversation
+
 on isTargetConversationOpen(processName, targetName)
     tell application "System Events"
         tell process processName
             try
-                set uiElements to entire contents of window 1
+                set mainWindow to my mainWeComWindow(processName)
+                set uiElements to entire contents of mainWindow
                 repeat with itemElement in uiElements
                     try
                         if (role of itemElement as text) is "AXStaticText" then
@@ -759,6 +1122,29 @@ on isTargetConversationOpen(processName, targetName)
     end tell
     return false
 end isTargetConversationOpen
+
+on mainWeComWindow(processName)
+    tell application "System Events"
+        tell process processName
+            set bestWindow to missing value
+            set bestArea to 0
+            repeat with itemWindow in windows
+                try
+                    set itemSize to size of itemWindow
+                    set itemWidth to item 1 of itemSize
+                    set itemHeight to item 2 of itemSize
+                    set itemArea to itemWidth * itemHeight
+                    if itemArea > bestArea then
+                        set bestArea to itemArea
+                        set bestWindow to itemWindow
+                    end if
+                end try
+            end repeat
+            if bestWindow is missing value then error "未找到企业微信主窗口"
+            return bestWindow
+        end tell
+    end tell
+end mainWeComWindow
 "#
 }
 
@@ -800,6 +1186,84 @@ mod tests {
                 text: "你好\n呀".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn parse_recent_chat_targets_skips_empty_and_duplicate_lines() {
+        let parsed = parse_recent_chat_targets(
+            "159\t143\t邹友\n191\t144\t@微信\n159\t164\t消息预览\n159\t207\t友友\n191\t208\t@微信\n159\t271\t行业资讯\n",
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(parsed, vec!["邹友".to_string(), "友友".to_string()]);
+    }
+
+    #[test]
+    fn parse_recent_chat_target_summaries_includes_preview_signature() {
+        let parsed = parse_recent_chat_target_summaries(
+            "159\t143\t邹友\n191\t144\t@微信\n159\t164\t新消息\n159\t207\t友友\n191\t208\t@微信\n159\t228\t旧消息\n",
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].name, "邹友");
+        assert_eq!(parsed[0].preview.as_deref(), Some("新消息"));
+        assert!(parsed[0].signature.contains("新消息"));
+        assert!(!parsed[0].signature.contains("rank:"));
+        assert_eq!(parsed[1].name, "友友");
+        assert_eq!(parsed[1].preview.as_deref(), Some("旧消息"));
+        assert!(parsed[1].signature.contains("旧消息"));
+    }
+
+    #[test]
+    fn parse_recent_chat_target_summaries_reads_fast_text_sequence() {
+        let parsed = parse_recent_chat_target_summaries(
+            "1\t邹友\n2\t可以快点吗\n3\t12分钟前\n4\t@微信\n5\t友友\n6\t哈哈哈\n7\t13分钟前\n8\t@微信\n",
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].name, "邹友");
+        assert_eq!(parsed[0].preview.as_deref(), Some("可以快点吗"));
+        assert_eq!(parsed[1].name, "友友");
+        assert_eq!(parsed[1].preview.as_deref(), Some("哈哈哈"));
+    }
+
+    #[test]
+    fn parse_recent_chat_target_summaries_keeps_time_like_preview() {
+        let parsed = parse_recent_chat_target_summaries(
+            "1\t邹友\n2\t14:08:03\n3\t刚刚\n4\t@微信\n5\t友友\n6\t5/7\n7\t@微信\n",
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].name, "邹友");
+        assert_eq!(parsed[0].preview.as_deref(), Some("14:08:03"));
+        assert_eq!(parsed[1].name, "友友");
+        assert_eq!(parsed[1].preview, None);
+    }
+
+    #[test]
+    fn parse_recent_chat_target_signature_ignores_row_order() {
+        let first = parse_recent_chat_target_summaries(
+            "159\t143\t邹友\n191\t144\t@微信\n159\t164\t新消息\n159\t207\t友友\n191\t208\t@微信\n159\t228\t旧消息\n",
+            12,
+        )
+        .unwrap();
+        let second = parse_recent_chat_target_summaries(
+            "159\t143\t友友\n191\t144\t@微信\n159\t164\t旧消息\n159\t207\t邹友\n191\t208\t@微信\n159\t228\t新消息\n",
+            12,
+        )
+        .unwrap();
+
+        let first_zou = first.iter().find(|target| target.name == "邹友").unwrap();
+        let second_zou = second.iter().find(|target| target.name == "邹友").unwrap();
+
+        assert_eq!(first_zou.signature, second_zou.signature);
     }
 
     #[test]

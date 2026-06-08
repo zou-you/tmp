@@ -33,6 +33,7 @@
 | `+smartsheet_update_records_auto_file` | `doc` | `SmartsheetUpdateRecordsAutoFileHelper` | `doc/smartsheet_update_records_auto_file.rs` | 更新智能表格记录（自动上传文件/图片） |
 | `+smartpage_create` | `doc` | `SmartpageCreateHelper` | `doc/smartpage_create.rs` | 创建智能文档（自动读取本地文件内容作为子页面） |
 | `+send_friend_message` | `msg` | `SendFriendMessageHelper` | `msg/send_friend_message.rs` | 通过 macOS 企业微信客户端给好友发送文本、图片或文件 |
+| `+watch_all` | `msg` | `WatchAllHelper` | `msg/watch_all.rs` | 准实时轮询所有最近活跃单聊新消息，并保存图片和文件 |
 | `+watch_friend` | `msg` | `WatchFriendHelper` | `msg/watch_friend.rs` | 轮询指定好友新消息，并保存图片和文件 |
 
 ---

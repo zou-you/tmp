@@ -1,15 +1,9 @@
-# 文档中心
+# 文档目录
 
-本目录是 `wecom-cli` 的长期维护文档集，用来承载安装、使用约定、Skills 导航和开发说明。根 `README.md` 保持为项目首页，不再承担所有细节参考。
+`wecom-cli` 的安装方式、初始化、命令格式、功能总览、常用示例、运行时路径和排错说明已统一整理到根目录 [`README.md`](../README.md)。
 
-## 从这里开始
+当前约定：
 
-- 查看 CLI 使用方法、运行时路径和环境变量：[`docs/cli-reference.md`](cli-reference.md)
-- macOS 桌面 helper 编译、安装和使用：[`docs/desktop-helpers-usage.md`](desktop-helpers-usage.md)
-- 查看内置 Skills 的分工和入口：[`docs/skills.md`](skills.md)
-- 本地开发、调试和仓库结构：[`docs/development.md`](development.md)
-
-## 维护约定
-
-- 优先把持续维护的说明写进 `docs/`。
-- 同一主题只保留一个主入口，其他页面通过链接复用。
+- 用户手册只维护 [`README.md`](../README.md)
+- 具体 AI Agent 业务工作流维护在 [`skills/`](../skills)
+- `docs/` 目录只保留历史入口，避免同一主题多处重复

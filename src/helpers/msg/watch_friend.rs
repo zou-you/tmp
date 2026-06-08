@@ -57,15 +57,15 @@ pub struct WatchFriendArgs {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-struct ChatSummary {
+pub(crate) struct ChatSummary {
     #[serde(default)]
-    chat_id: String,
+    pub(crate) chat_id: String,
     #[serde(default)]
-    chat_name: String,
+    pub(crate) chat_name: String,
     #[serde(default)]
-    last_msg_time: Option<String>,
+    pub(crate) last_msg_time: Option<String>,
     #[serde(default)]
-    msg_count: Option<u64>,
+    pub(crate) msg_count: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -79,15 +79,15 @@ struct ContactUser {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-struct WatchState {
-    seen: BTreeSet<String>,
+pub(crate) struct WatchState {
+    pub(crate) seen: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct WatchTargetMeta {
-    target: String,
-    chat_id: String,
-    chat_name: String,
+pub(crate) struct WatchTargetMeta {
+    pub(crate) target: String,
+    pub(crate) chat_id: String,
+    pub(crate) chat_name: String,
 }
 
 #[derive(Debug)]
@@ -571,7 +571,7 @@ async fn await_watch_workers(handles: Vec<JoinHandle<Result<()>>>) -> Result<()>
     }
 }
 
-fn message_sort_key(message: &Value) -> String {
+pub(crate) fn message_sort_key(message: &Value) -> String {
     message
         .get("send_time")
         .and_then(Value::as_str)
@@ -586,6 +586,17 @@ fn recent_seven_day_window() -> (String, String) {
         .as_secs() as i64
         + 8 * 60 * 60;
     let begin = end - 7 * 24 * 60 * 60 + 1;
+    (format_wecom_time(begin), format_wecom_time(end))
+}
+
+pub(crate) fn recent_seconds_window(seconds: u64) -> (String, String) {
+    let end = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
+        + 8 * 60 * 60;
+    let seconds = i64::try_from(seconds).unwrap_or(i64::MAX);
+    let begin = end.saturating_sub(seconds);
     (format_wecom_time(begin), format_wecom_time(end))
 }
 
@@ -616,7 +627,7 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, i64, i64) {
     (year, month, day)
 }
 
-async fn fetch_chat_list(begin_time: &str, end_time: &str) -> Result<Vec<ChatSummary>> {
+pub(crate) async fn fetch_chat_list(begin_time: &str, end_time: &str) -> Result<Vec<ChatSummary>> {
     let mut cursor: Option<String> = None;
     let mut chats = Vec::new();
 
@@ -764,7 +775,11 @@ where
     )
 }
 
-async fn fetch_messages(chat_id: &str, begin_time: &str, end_time: &str) -> Result<Vec<Value>> {
+pub(crate) async fn fetch_messages(
+    chat_id: &str,
+    begin_time: &str,
+    end_time: &str,
+) -> Result<Vec<Value>> {
     let mut cursor: Option<String> = None;
     let mut messages = Vec::new();
 
@@ -799,7 +814,7 @@ async fn fetch_messages(chat_id: &str, begin_time: &str, end_time: &str) -> Resu
     bail!("get_message 分页超过 {MAX_PAGES} 页，已停止以避免无限循环")
 }
 
-async fn build_output_message(
+pub(crate) async fn build_output_message(
     meta: &WatchTargetMeta,
     message: Value,
     save_dir: &Path,
@@ -890,7 +905,7 @@ fn media_id_for<'a>(message: &'a Value, msgtype: &str) -> Option<&'a str> {
         .and_then(Value::as_str)
 }
 
-fn message_dedup_key(chat_id: &str, message: &Value) -> String {
+pub(crate) fn message_dedup_key(chat_id: &str, message: &Value) -> String {
     if let Some(desktop_key) = message.pointer("/desktop/key").and_then(Value::as_str) {
         return format!("{chat_id}|desktop|{desktop_key}");
     }
@@ -946,7 +961,7 @@ fn state_file_path(save_dir: &Path, chat_id: &str) -> PathBuf {
     save_dir.join(format!(".watch_friend_{name}.json"))
 }
 
-async fn load_state(path: &Path) -> Result<WatchState> {
+pub(crate) async fn load_state(path: &Path) -> Result<WatchState> {
     match tokio::fs::read_to_string(path).await {
         Ok(content) => serde_json::from_str(&content)
             .with_context(|| format!("解析状态文件失败: {}", path.display())),
@@ -955,7 +970,7 @@ async fn load_state(path: &Path) -> Result<WatchState> {
     }
 }
 
-fn save_state(path: &Path, state: &WatchState) -> Result<()> {
+pub(crate) fn save_state(path: &Path, state: &WatchState) -> Result<()> {
     let data = serde_json::to_vec_pretty(state)?;
     atomic_write(path, &data, Some(0o600))
         .with_context(|| format!("写入状态文件失败: {}", path.display()))

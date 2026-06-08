@@ -1,6 +1,6 @@
 ---
 name: wecomcli-msg
-description: 企业微信消息技能。提供会话列表查询、消息记录拉取（支持文本/图片/文件/语音/视频）、多媒体文件获取、文本消息发送，以及 macOS 企业微信客户端 helper 发送好友文本/图片/文件和轮询好友新消息。当用户需要"查看消息"、"看聊天记录"、"发消息给某人"、"发图片/文件给好友"、"监听某个好友消息"、"最近有什么消息"、"给群里发消息"、"看看发了什么图片/文件"时触发。
+description: 企业微信消息技能。提供会话列表查询、消息记录拉取（支持文本/图片/文件/语音/视频）、多媒体文件获取、文本消息发送，以及 macOS 企业微信客户端 helper 发送好友文本/图片/文件和轮询好友/全部新消息。当用户需要"查看消息"、"看聊天记录"、"发消息给某人"、"发图片/文件给好友"、"监听某个好友消息"、"监听全部新消息"、"最近有什么消息"、"给群里发消息"、"看看发了什么图片/文件"时触发。
 metadata:
   requires:
     bins: ["wecom-cli"]
@@ -68,6 +68,14 @@ wecom-cli msg +watch_friend --to "张三-客户" --to "李四-客户" --interval
 ```
 
 按好友名称解析最近 7 天内单聊会话，轮询 `get_message`；可重复传 `--to` 并行监控多个联系人。图片和文件会调用 `get_msg_media` 保存到本地，并以 NDJSON 输出。参见 [helper 详情](references/watch-friend.md)。
+
+### +watch_all — 准实时轮询所有最近活跃单聊新消息
+
+```bash
+wecom-cli msg +watch_all --interval-sec 10 --save-dir /tmp/wecom/media
+```
+
+按短时间窗口轮询 `get_msg_chat_list` 获取最近活跃会话，再对变化的单聊会话调用 `get_message`。启动时只建立基线，不回放历史；后续新消息以 NDJSON 输出，图片和文件会调用 `get_msg_media` 保存到本地。
 
 ---
 
